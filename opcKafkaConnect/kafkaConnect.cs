@@ -35,9 +35,9 @@ namespace opcKafkaConnect
             
             // instance the schema registry
             schemaRegistry = new CachedSchemaRegistryClient(new SchemaRegistryConfig(){
-                Url = "localhost:8081", 
+                Url = producer_conf.SchemaRegistryURL, 
                 ValueSubjectNameStrategy = SubjectNameStrategy.TopicRecord
-                } );
+            } );
             
             // instace producer with Avro serializers
             producer = new ProducerBuilder<string, GenericRecord>(producer_conf._conf)
@@ -50,7 +50,7 @@ namespace opcKafkaConnect
 
         public void OnNotification(object emitter, MonItemNotificationArgs items){
             foreach(var itm in items.values){
-                var time = new Timestamp(itm.SourceTimestamp); 
+                var time = new Timestamp(itm.SourceTimestamp);
                 //var m = new Message<String,GenericRecord> {Value=itm.Value.ToString(), Key=items.name, Timestamp=time};
                 
                 // not waiting here
@@ -102,7 +102,13 @@ namespace opcKafkaConnect
             kafkaProducer = new kafkaProducerConf();
         }
     }
+    /// <summary>
+    /// You can find definition of all props in https://docs.confluent.io/current/clients/confluent-kafka-dotnet/api/Confluent.Kafka.ProducerConfig.html
+    /// and 
+    /// 
+    /// </summary>
     public class kafkaProducerConf{
+        public string SchemaRegistryURL {get; set;}
         public string BootstrapServers {get{return _conf.BootstrapServers;} set{_conf.BootstrapServers = value;}}
         public int? BatchNumMessages{get{return _conf.BatchNumMessages;} set{_conf.BatchNumMessages = value;}}
         
@@ -122,6 +128,7 @@ namespace opcKafkaConnect
             _conf = new ProducerConfig();
             BootstrapServers = "localhost:9092";
             LingerMs = 100;
+            SchemaRegistryURL = "localhost:8081";
         }
     }
 }
