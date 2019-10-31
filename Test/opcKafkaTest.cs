@@ -5,6 +5,11 @@ using Newtonsoft.Json.Linq;
 using Confluent.Kafka;
 using NLog;
 
+using Avro;
+using Avro.Generic;
+using Confluent.SchemaRegistry.Serdes;
+using Confluent.SchemaRegistry;
+
 namespace Test
 {
     public class opcKafkaTest
@@ -22,11 +27,14 @@ namespace Test
 
             kafka = new KafkaConnect();
             var conf = JObject.Parse(@"{
-                MessageSendMaxRetries: 100,
-                BatchNumMessages:23,
-                QueueBufferingMaxKbytes:100,
-                QueueBufferingMaxMessages:32,
-                MessageTimeoutMs:10,
+                kafkaProducer:{
+                    MessageSendMaxRetries: 100,
+                    BatchNumMessages:23,
+                    QueueBufferingMaxKbytes:100,
+                    QueueBufferingMaxMessages:32,
+                    MessageTimeoutMs:10000,
+                    LingerMs:200
+                }
             }");
             kafka.init(conf);
 
@@ -35,21 +43,58 @@ namespace Test
         [Fact]
         public void Init()
         {
-            Assert.Equal(100, kafka._conf._conf.MessageSendMaxRetries);
-            Assert.Equal(23, kafka._conf._conf.BatchNumMessages);
-            Assert.Equal(100, kafka._conf._conf.QueueBufferingMaxKbytes);
-            Assert.Equal(32,kafka._conf._conf.QueueBufferingMaxMessages);
-            Assert.Equal(10, kafka._conf._conf.MessageTimeoutMs);
+            // config works
+            Assert.Equal(100, kafka.producer_conf._conf.MessageSendMaxRetries);
+            Assert.Equal(23, kafka.producer_conf._conf.BatchNumMessages);
+            Assert.Equal(100, kafka.producer_conf._conf.QueueBufferingMaxKbytes);
+            Assert.Equal(32,kafka.producer_conf._conf.QueueBufferingMaxMessages);
+            Assert.Equal(10000, kafka.producer_conf._conf.MessageTimeoutMs);
         }
         [Fact]
-        public void message(){
-            var m = new Message<string,string>{ Value="test bello", Key="hey"};
-            kafka.sendMessage("test-topic", m);
-            Console.WriteLine("first message sent");
-            //System.Threading.Thread.Sleep(10000);
-            kafka.sendMessage("test-topic1", m);
-            Console.WriteLine("second message sent");
+        public async void str_message(){
+            // Message schema
+             RecordSchema string_schema = (RecordSchema)RecordSchema.Parse(@"
+                {
+                    ""type"": ""record"",
+                    ""name"": ""str"",
+                    ""fields"": [
+                        {""name"": ""value"", ""type"": ""string""}
+                    ]
+                }");
+            // fill the record
+            var record = new GenericRecord(string_schema);
+            record.Add("value","ciao");
 
+            //sending message succeded
+            var m = new Message<string,GenericRecord>{ Value=record, Key="hey", Timestamp=new Timestamp()};
+            var status = await kafka.sendMessage("test-topic", m);
+            Assert.Equal(kafkaMessageStatus.Delivered,status);
+        }
+        [Fact]
+        public async void double_message(){
+            // Message schema
+             RecordSchema string_schema = (RecordSchema)RecordSchema.Parse(@"
+                {
+                    ""type"": ""record"",
+                    ""name"": ""dbl"",
+                    ""fields"": [
+                        {""name"": ""value"", ""type"": ""double""}
+                    ]
+                }");
+            // fill the record
+            var record = new GenericRecord(string_schema);
+            record.Add("value",1098.87);
+
+            //sending message succeded
+            var m = new Message<string,GenericRecord>{ Value=record, Key="yoyo", Timestamp=new Timestamp()};
+            var status = await kafka.sendMessage("test-topic", m);
+            Assert.Equal(kafkaMessageStatus.Delivered,status);
+        }
+
+        [Fact]
+        public void AvroTest()
+        {
+            kafka.avroTest();
         }
     }
 }
