@@ -4,7 +4,7 @@ using opcKafkaConnect;
 using Newtonsoft.Json.Linq; 
 using Confluent.Kafka;
 using NLog;
-
+using Opc.Ua; 
 using Avro;
 using Avro.Generic;
 using Confluent.SchemaRegistry.Serdes;
@@ -92,9 +92,26 @@ namespace Test
         }
 
         [Fact]
-        public void AvroTest()
-        {
-            kafka.avroTest();
+        public async void onNotificationTest()
+        {   // the closet test possible of onNotification function
+            DataValue v = new DataValue();
+            opcSchemas sl = new opcSchemas();
+            var s = sl.GetSchema(typeof(System.Int16));
+            v.SourceTimestamp = DateTime.Now;
+            v.Value = (Int16) 73;
+            var m = kafka.buildKafkaMessage(v,s,typeof(System.Int16),"int16");
+            var status = await kafka.sendMessage("test-topic",m);
+            Assert.Equal(kafkaMessageStatus.Delivered,status);
+
+            // convert from long to int32 should fail
+            v.Value = (long) 2147483658;
+            m = kafka.buildKafkaMessage(v,s,typeof(System.Int32),"int32");
+            Assert.Null(m);
+
+            v.Value = (Single) 76.9;
+            m = kafka.buildKafkaMessage(v,s,typeof(System.Int32),"float_converted_to_Int");
+            status = await kafka.sendMessage("test-topic",m);
+            Assert.Equal(kafkaMessageStatus.Delivered,status);
         }
     }
 }

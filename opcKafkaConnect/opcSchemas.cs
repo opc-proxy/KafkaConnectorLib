@@ -1,19 +1,8 @@
 using System;
-using System.Threading.Tasks;
-using Confluent.Kafka;
-using OpcProxyClient; 
-using Opc.Ua; 
-using OpcProxyCore;
-using Newtonsoft.Json.Linq;
-using NLog;
-
 using Avro;
-using Avro.Generic;
-using Confluent.SchemaRegistry.Serdes;
-using Confluent.SchemaRegistry;
 
 namespace opcKafkaConnect{
-    class opcSchemas{
+    public class opcSchemas{
         public RecordSchema stringType;
         public RecordSchema doubleType;
         public RecordSchema intType;
@@ -21,7 +10,7 @@ namespace opcKafkaConnect{
         public RecordSchema floatType;
         public RecordSchema longType;
 
-        opcSchemas(){
+        public opcSchemas(){
             stringType  = (RecordSchema)RecordSchema.Parse(buildSchema("string"));
             doubleType  = (RecordSchema)RecordSchema.Parse(buildSchema("double"));
             intType     = (RecordSchema)RecordSchema.Parse(buildSchema("int"));
@@ -63,7 +52,7 @@ namespace opcKafkaConnect{
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        public Type getAvroType(Type t){
+        public static Type getAvroType(Type t){
             TypeCode code = Type.GetTypeCode(t);
             switch(code){
                 case TypeCode.Int16 :

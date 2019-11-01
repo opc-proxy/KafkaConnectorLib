@@ -12,7 +12,6 @@ using Avro.Generic;
 using Confluent.SchemaRegistry.Serdes;
 using Confluent.SchemaRegistry;
 
-
 namespace opcKafkaConnect
 {
     public class KafkaConnect : IOPCconnect
@@ -24,6 +23,8 @@ namespace opcKafkaConnect
         public kafkaProducerConf producer_conf;
 
         public CachedSchemaRegistryClient  schemaRegistry;
+
+        public opcSchemas schemasHolder;
 
         public void init(JObject config){ 
             // setup the logger
@@ -38,6 +39,8 @@ namespace opcKafkaConnect
                 Url = producer_conf.SchemaRegistryURL, 
                 ValueSubjectNameStrategy = SubjectNameStrategy.TopicRecord
             } );
+            // instance the List of schemas
+            schemasHolder = new opcSchemas();
             
             // instace producer with Avro serializers
             producer = new ProducerBuilder<string, GenericRecord>(producer_conf._conf)
@@ -48,35 +51,52 @@ namespace opcKafkaConnect
             // instance consumer in new thread
         }
 
+        /// <summary>
+        /// Event handler that fires any time there is a change in a OPC monitored variable
+        /// </summary>
+        /// <param name="emitter"></param>
+        /// <param name="items"></param>
         public void OnNotification(object emitter, MonItemNotificationArgs items){
-            foreach(var itm in items.values){
-                var time = new Timestamp(itm.SourceTimestamp);
-                //var m = new Message<String,GenericRecord> {Value=itm.Value.ToString(), Key=items.name, Timestamp=time};
-                
-                // not waiting here
-                //var status = sendMessage("test-topic",m);
-                //log.Debug("Sending message {0}:{1}  t:{2}",m.Key,m.Value,m.Timestamp.ToString());
-                
+
+            RecordSchema schema = schemasHolder.GetSchema(items.dataType);
+            if(schema != null){
+                foreach(var itm in items.values){
+                    if(DataValue.IsBad(itm)) continue;
+                    var m = buildKafkaMessage(itm,schema,items.dataType,items.name);
+                    if(m ==null) continue;
+                    // not waiting here
+                    var status = sendMessage("test-topic",m);
+                    log.Debug("Sending message {0}:{1}  t:{2}",m.Key,m.Value,m.Timestamp.ToString());
+                }
             }
         }
 
-        public void avroTest(){
-            /*
-            Avro.RecordSchema s =  (RecordSchema)RecordSchema.Parse(@"{
-                    type: ""record"",
-                    name: ""string"",
-                    fields: [
-                        {name: ""value"", type: ""string""},
-                    ]
-                  }");
-            GenericRecord r = new GenericRecord(s);
-            r.Add("value","ciao");
-            new AvroSerializer<string>()
-            */
-            
+        /// <summary>
+        /// Build an Avro compatible Kafka message
+        /// </summary>
+        /// <param name="data">the dataValue</param>
+        /// <param name="schema">Avro schema</param>
+        /// <param name="dataType">Type of the data</param>
+        /// <param name="name">Name of variable to be put as key</param>
+        /// <returns></returns>
+        public Message<String,GenericRecord> buildKafkaMessage(DataValue data, RecordSchema schema, Type dataType, string name){
+            var time = new Timestamp(data.SourceTimestamp);
+            var record = new GenericRecord(schema);
+            try{
+                // converting item value to the supported Avro type, only makes a difference for Int16
+                var value = Convert.ChangeType(data.Value, opcSchemas.getAvroType(dataType));
+                record.Add("value", value);
+                var m = new Message<String,GenericRecord> {Value=record, Key=name, Timestamp=time};
+                return m;            
+            }
+            catch(Exception e){
+                log.Error("Cannot convert value " +data.Value.ToString() +" to " +dataType.ToString());
+                log.Error(e.Message);
+                return null;
+            }
         }
-        public async Task<kafkaMessageStatus> sendMessage(string topic, Message<String,GenericRecord> message){
 
+        public async Task<kafkaMessageStatus> sendMessage(string topic, Message<String,GenericRecord> message){
             try{
                 var deliveryResponse = await producer.ProduceAsync(topic, message);
                 log.Debug("Delivered message {0}:{1}  t:{2}",deliveryResponse.Key,deliveryResponse.Value,deliveryResponse.Timestamp.UtcDateTime);
