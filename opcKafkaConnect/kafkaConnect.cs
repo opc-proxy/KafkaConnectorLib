@@ -118,8 +118,12 @@ namespace opcKafkaConnect
 
     public class kafkaConfWrapper{
         public kafkaProducerConf kafkaProducer {get; set;}
+        public kafkaConsumerConf kafkaConsumer {get; set;}
+        public string opcSystemName;
         public kafkaConfWrapper(){
             kafkaProducer = new kafkaProducerConf();
+            kafkaConsumer = new kafkaConsumerConf();
+            opcSystemName = "OPC";
         }
     }
     /// <summary>

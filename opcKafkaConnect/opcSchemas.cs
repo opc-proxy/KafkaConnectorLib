@@ -9,6 +9,9 @@ namespace opcKafkaConnect{
         public RecordSchema booleanType;
         public RecordSchema floatType;
         public RecordSchema longType;
+        public RecordSchema ack_message;
+        public RecordSchema error_message;
+        public RecordSchema kafka_message;
 
         public opcSchemas(){
             stringType  = (RecordSchema)RecordSchema.Parse(buildSchema("string"));
@@ -17,6 +20,40 @@ namespace opcKafkaConnect{
             floatType   = (RecordSchema)RecordSchema.Parse(buildSchema("float"));
             booleanType = (RecordSchema)RecordSchema.Parse(buildSchema("boolean"));
             longType    = (RecordSchema)RecordSchema.Parse(buildSchema("long"));
+
+            kafka_message = (RecordSchema)RecordSchema.Parse(
+                @"{
+                    name: 'message', 
+                    type: 'record', fields: [
+                            { name: 'key', type:'string'},
+                            { name: 'value', type:'string'},
+                            { name: 'timestamp', type:'string'},
+                        ]
+                }");
+
+            ack_message = (RecordSchema)RecordSchema.Parse(
+                @"{
+                    type:'record',
+                    name:'acknowledge_write',
+                    fields: [
+                            { name: 'key', type:'string'},
+                            { name: 'value', type:'string'},
+                            { name: 'timestamp', type:'string'},
+                            {name:'kafkaTPO', type:'string', doc:'The topic-partition-offset of the message to be used as a universal identifier string'},
+                            {name:'status', type:'string'}
+                    ]
+            }");
+            
+            error_message = (RecordSchema)RecordSchema.Parse(
+                @"{
+                    type :'record',
+                    name: 'error',
+                    fields :[
+                        {name:'subsystem', type:'string'},
+                        {name: 'action', type:'string'},
+                        {name:'message', type:'string'}
+                    ]
+            }");
         }
 
         string buildSchema(string type){
