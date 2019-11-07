@@ -26,7 +26,7 @@ namespace opcKafkaConnect
 
         public opcSchemas schemasHolder;
 
-        public void init(JObject config){ 
+        public async void init(JObject config){ 
             // setup the logger
             log = LogManager.GetLogger(this.GetType().Name);
 
@@ -39,6 +39,11 @@ namespace opcKafkaConnect
                 Url = producer_conf.SchemaRegistryURL, 
                 ValueSubjectNameStrategy = SubjectNameStrategy.TopicRecord
             } );
+            // This will crash if schema registry is offline FIXME, 
+            // this part is only here to make sure the user has the schema registry up, otherwise
+            // the error is misleading: "Delivery failed: Local: Key serialization error"
+            var lst = await schemaRegistry.GetAllSubjectsAsync();
+
             // instance the List of schemas
             schemasHolder = new opcSchemas();
             
@@ -65,7 +70,7 @@ namespace opcKafkaConnect
                     var m = buildKafkaMessage(itm,schema,items.dataType,items.name);
                     if(m ==null) continue;
                     // not waiting here
-                    var status = sendMessage("test-topic",m);
+                    var status = sendMessage("balla",m);
                     log.Debug("Sending message {0}:{1}  t:{2}",m.Key,m.Value,m.Timestamp.ToString());
                 }
             }
@@ -96,7 +101,7 @@ namespace opcKafkaConnect
             }
         }
 
-        public async Task<kafkaMessageStatus> sendMessage(string topic, Message<String,GenericRecord> message){
+        public async Task<kafkaMessageStatus> sendMessage(String topic, Message<String,GenericRecord> message){
             try{
                 var deliveryResponse = await producer.ProduceAsync(topic, message);
                 log.Debug("Delivered message {0}:{1}  t:{2}",deliveryResponse.Key,deliveryResponse.Value,deliveryResponse.Timestamp.UtcDateTime);

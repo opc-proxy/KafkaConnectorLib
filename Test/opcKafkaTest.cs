@@ -67,7 +67,7 @@ namespace Test
 
             //sending message succeded
             var m = new Message<string,GenericRecord>{ Value=record, Key="hey", Timestamp=new Timestamp()};
-            var status = await kafka.sendMessage("test-topic", m);
+            var status = await kafka.sendMessage("test-topic-g", m);
             Assert.Equal(kafkaMessageStatus.Delivered,status);
         }
         [Fact]
@@ -87,7 +87,7 @@ namespace Test
 
             //sending message succeded
             var m = new Message<string,GenericRecord>{ Value=record, Key="yoyo", Timestamp=new Timestamp()};
-            var status = await kafka.sendMessage("test-topic", m);
+            var status = await kafka.sendMessage("test-topic-g", m);
             Assert.Equal(kafkaMessageStatus.Delivered,status);
         }
 
@@ -100,7 +100,7 @@ namespace Test
             v.SourceTimestamp = DateTime.Now;
             v.Value = (Int16) 73;
             var m = kafka.buildKafkaMessage(v,s,typeof(System.Int16),"int16");
-            var status = await kafka.sendMessage("test-topic",m);
+            var status = await kafka.sendMessage("test-topic-g",m);
             Assert.Equal(kafkaMessageStatus.Delivered,status);
 
             // convert from long to int32 should fail
@@ -110,7 +110,7 @@ namespace Test
 
             v.Value = (Single) 76.9;
             m = kafka.buildKafkaMessage(v,s,typeof(System.Int32),"float_converted_to_Int");
-            status = await kafka.sendMessage("test-topic",m);
+            status = await kafka.sendMessage("test-topic-g",m);
             Assert.Equal(kafkaMessageStatus.Delivered,status);
         }
     }
