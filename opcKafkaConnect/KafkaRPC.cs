@@ -8,39 +8,53 @@ using OpcProxyCore;
 using Newtonsoft.Json.Linq;
 using NLog;
 
+using System.Collections.Generic;
 using Avro;
 using Avro.Generic;
 using Confluent.SchemaRegistry.Serdes;
 using Confluent.SchemaRegistry;
+using Confluent.Kafka.SyncOverAsync;
 
 namespace opcKafkaConnect
 {
-    public class opcKafkaConsumer{
-        public IConsumer<String,String> _consumer;
+    /// <summary>
+    /// Class that instanciate a kafka consumer and producer for a kafka-RPC based comunication,
+    /// the protocol used is JSON-RPC-2.0, the producer and consumer are optimized for low latency
+    /// and can be configured independently from the main data-stream.
+    /// </summary>
+    public class opcKafkaRPC{
+        private IConsumer<String,GenericRecord> _consumer;
         private IProducer<String,GenericRecord> _producer;
         private serviceManager _serv;
-
-        private opcSchemas schemas;
+        private opcSchemas _schemas;
         private Logger logger;
-        public string systemName ;
-        public opcKafkaConsumer(kafkaConsumerConf config, string system_name){
-            logger = LogManager.GetLogger(this.GetType().Name);
-            schemas = new opcSchemas();
-            systemName = system_name;
-            // Override default GroupID if name exist
-            if(config.GroupId == "OPC") config.GroupId = systemName;
 
-            _consumer = new ConsumerBuilder<String, String>(config._conf)
+        public opcKafkaRPC( kafkaRPCConf conf, CachedSchemaRegistryClient schemaRegistry ){
+            logger = LogManager.GetLogger(this.GetType().Name);
+            _schemas = new opcSchemas();
+
+            // Override default GroupID if name exist
+            if(conf.GroupId == "OPC") conf.GroupId = conf.opcSystemName;
+            
+            // build the consumer, and subscribe it to topic
+            _consumer = new ConsumerBuilder<String, GenericRecord>(conf.getConsumerConf())
+            .SetValueDeserializer(new AvroDeserializer<GenericRecord>(schemaRegistry).AsSyncOverAsync())
             .SetErrorHandler((_, e) => logger.Error($"Error: {e.Reason}"))
             .Build();
-            _consumer.Subscribe( systemName + "-WriteTo");
+            _consumer.Subscribe( conf.opcSystemName + "-request");
 
+            // build the producer for the responses
+            var producer_conf = new ProducerConfig(){
+                BootstrapServers = conf.BootstrapServers, 
+                LingerMs = 5   // low latency response
+            };
+            _producer = new ProducerBuilder<String, GenericRecord>(producer_conf)
+            .SetValueSerializer(new AvroSerializer<GenericRecord>(schemaRegistry))
+            .SetErrorHandler((_, e) => logger.Error($"Error: {e.Reason}"))
+            .Build();
         }
         public void setManager(serviceManager m){
             _serv = m;
-        }
-        public void setProducer(IProducer<String,GenericRecord> p){
-            _producer = p;
         }
         
         /// <summary>
@@ -61,8 +75,10 @@ namespace opcKafkaConnect
                                 var consumeResult = _consumer.Consume(cancel);
                                 logger.Debug("Received kafka message in topic:"+consumeResult.Topic + " key:"+consumeResult.Key + " value:"+ consumeResult.Value);
                                 
+                                JRequest req = validateRequest(consumeResult);
+
                                 // Write to OPC and check status of write operation
-                                var status = await _serv.writeToOPCserver(consumeResult.Key, consumeResult.Value);
+                                /*var status = await _serv.writeToOPCserver(req.props[0], req.props[1]);
                                 if(status != null && status.Count > 0 && StatusCode.IsGood(status[0])){
 
                                     GenericRecord r = new GenericRecord(schemas.ack_message);
@@ -79,7 +95,7 @@ namespace opcKafkaConnect
                                     r.Add("action","OPC");
                                     r.Add("message","ERROR");
                                     var bla = _producer.ProduceAsync("error",new Message<string, GenericRecord>{Key="error-test", Value=r});
-                                }
+                                }*/
                             }
                             catch(MessageNullException e){
                                 logger.Error(e.Message);
@@ -102,26 +118,54 @@ namespace opcKafkaConnect
 
             return Task.Run(action,cancel);
             
-        }   
-    }
-
-    public class kafkaConsumerConf{
-        public ConsumerConfig _conf {get; set;}
-        public string BootstrapServers {get{return _conf.BootstrapServers;} set{_conf.BootstrapServers = value;}}
-        public string GroupId {get{return _conf.GroupId;} set{_conf.GroupId = value;}}
-
-        public kafkaConsumerConf(){
-            _conf = new ConsumerConfig();
-            BootstrapServers = "localhost:9092";
-            GroupId = "OPC";
-            // Necessary behaviour for OPC WRITE
-            _conf.EnableAutoCommit = true;
-            _conf.EnableAutoOffsetStore = true;
-            _conf.AutoCommitIntervalMs = 100;
-            _conf.SessionTimeoutMs = 6000;
-            _conf.AutoOffsetReset = AutoOffsetReset.Latest;
-            _conf.EnablePartitionEof = false;
-            _conf.FetchWaitMaxMs = 0;
         }
+
+        public JRequest validateRequest(ConsumeResult<String,GenericRecord> input){
+            
+            object method;
+            object props;
+            object[] props_array;
+            object id;
+            List<String> supported_methods = new List<String>{"write"};
+            JRequest req = new JRequest();
+
+            // Validate correct types
+            input.Value.TryGetValue("method", out method);
+            if(method == null || method.GetType() != typeof(String)) throw new Exception();
+            
+            input.Value.TryGetValue("props", out props);
+            if( props == null || props.GetType() != typeof(Object[])) throw new Exception();
+            props_array = (Object[])props;
+
+            input.Value.TryGetValue("id", out id);
+            if(id == null || id.GetType() != typeof(Int32)) throw new Exception();
+
+            // method not supported
+            if(!supported_methods.Contains((String)method)) throw new Exception();
+
+            // Check if fullfills the write method props
+            if((String)method == "write") {
+                if( props_array.Length != 2 ) throw new Exception();
+                if( props_array[0].GetType() != typeof(String)) throw new Exception();
+                if( props_array[1].GetType() != typeof(String)) throw new Exception();
+            }
+
+            req.method = (String)method;
+            req.props = props_array;
+            req.id = (Int32)id;
+
+            return req;
+        }
+
+        public class JRequest {
+            public string method {get;set;}
+            public object[] props {get;set;}
+            public Int32 id {get; set;}
+            public JRequest(){
+                method = "";
+                props = new Object[]{};
+                id = -999;
+            }
+        }   
     }
 }

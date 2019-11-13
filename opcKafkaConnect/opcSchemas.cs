@@ -57,7 +57,7 @@ namespace opcKafkaConnect{
         }
 
         string buildSchema(string type){
-            return "{type: 'record',name:'"+type+"Type',fields:[{name:'value', type:'"+type+"'}]}";
+            return "{type: 'record',name:'"+type+"Type',fields:[{name:'value', type:'"+type+"'},{name:'type', type:'string', default:'null'}]}";
         }
 
         public RecordSchema GetSchema(Type t){
@@ -89,7 +89,7 @@ namespace opcKafkaConnect{
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        public static Type getAvroType(Type t){
+        public static Type getAvroSerializationType(Type t){
             TypeCode code = Type.GetTypeCode(t);
             switch(code){
                 case TypeCode.Int16 :
@@ -106,6 +106,35 @@ namespace opcKafkaConnect{
                     return typeof(System.Double);
                 case TypeCode.String:
                     return typeof(System.String);
+                default:
+                    return null;
+            }
+        }
+
+
+        /// <summary>
+        /// Helper function to get the Avro type for an object according to Avro
+        /// serialization names.
+        /// </summary>
+        /// <param name="t"></param>
+        /// <returns></returns>
+        public static string getAvroType(Type t){
+            TypeCode code = Type.GetTypeCode(t);
+            switch(code){
+                case TypeCode.Int16 :
+                    return "int";
+                case TypeCode.Int32 :
+                    return "int";
+                case TypeCode.Int64 :
+                    return "long";
+                case TypeCode.Boolean :
+                    return "boolean";
+                case TypeCode.Single:
+                    return "float";
+                case TypeCode.Double:
+                    return "double";
+                case TypeCode.String:
+                    return "string";
                 default:
                     return null;
             }
