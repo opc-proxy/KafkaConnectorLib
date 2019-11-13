@@ -1,9 +1,15 @@
 # KafkaConnectorLib
 
+This library add the ability to the opc-proxy to stream data to a kafka server. It supports:
+
+- Sending data stream on a topic when opc-variables change (notification form opc-server)
+- Bidirectional comunication with the PLC using an RPC protocol. The protocol supported is JSON-RPC-2.0.
+- Read and Write of OPC variable to server trough Kafka producer/consumer client.
+
 ### Requirements
 - Kafka server running with at least one broker.
 - Confluent Schema Registry running with at least one end-point.
-- Avro serialization and deserialization library.
+- On your client side you need support for: kafka-producer/consumer and Avro serialization/deserialization library.
 
 ### Configuration
 ```javascript
@@ -27,4 +33,6 @@
 ```
 
 ### Data Serialization
+
+### RPC Protocol Trough Kafka
 
