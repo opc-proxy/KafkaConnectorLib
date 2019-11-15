@@ -1,4 +1,5 @@
 using Confluent.Kafka;
+using System;
 
 namespace opcKafkaConnect{
 
@@ -7,12 +8,21 @@ namespace opcKafkaConnect{
     public class kafkaConfWrapper{
         public kafkaProducerConf kafkaProducer {get; set;}
         public kafkaRPCConf kafkaRPC {get; set;}
-        public string opcSystemName {get {return this.opcSystemName;} set{this.opcSystemName = value; kafkaRPC.opcSystemName = value; }}
+        public string opcSystemName {
+            get {return _opcSystemName;} 
+            set{
+                _opcSystemName = value; 
+                kafkaRPC.opcSystemName = value; 
+                kafkaProducer.opcSystemName = value;
+            }
+        }
+        private string _opcSystemName;
+        private string _KafkaServers;
         public string KafkaSchemaRegistryURL {get; set;}
         public string KafkaServers {
-            get{return this.KafkaServers;} 
+            get{return _KafkaServers;} 
             set{
-                this.KafkaServers = value; 
+                _KafkaServers = value; 
                 if(kafkaProducer.BootstrapServers == "localhost:9092") kafkaProducer.BootstrapServers = value;
                 if(kafkaRPC.BootstrapServers == "localhost:9092") kafkaRPC.BootstrapServers = value;
             }
@@ -25,6 +35,8 @@ namespace opcKafkaConnect{
             opcSystemName = "OPC";
             KafkaSchemaRegistryURL = "localhost:8081";
             KafkaServers = "localhost:9092";
+
+
         }
     }
 
@@ -59,6 +71,7 @@ namespace opcKafkaConnect{
     /// 
     /// </summary>
     public class kafkaProducerConf{
+        public string opcSystemName;
         public string BootstrapServers {get{return _conf.BootstrapServers;} set{_conf.BootstrapServers = value;}}
         public int? BatchNumMessages{get{return _conf.BatchNumMessages;} set{_conf.BatchNumMessages = value;}}
         
@@ -79,6 +92,7 @@ namespace opcKafkaConnect{
             _conf = new ProducerConfig();
             BootstrapServers = "localhost:9092";
             LingerMs = 100;
+            opcSystemName = "OPC";
         }
     }
 

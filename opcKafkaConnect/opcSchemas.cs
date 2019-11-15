@@ -1,76 +1,111 @@
 using System;
 using Avro;
 
-namespace opcKafkaConnect{
-    public class opcSchemas{
+namespace opcKafkaConnect
+{
+    public class opcSchemas
+    {
         public RecordSchema stringType;
         public RecordSchema doubleType;
         public RecordSchema intType;
         public RecordSchema booleanType;
         public RecordSchema floatType;
         public RecordSchema longType;
-        public RecordSchema ack_message;
-        public RecordSchema error_message;
-        public RecordSchema kafka_message;
+        public RecordSchema rpcRequest;
+        public RecordSchema rpcResponse;
+        public RecordSchema rpcError;
 
-        public opcSchemas(){
-            stringType  = (RecordSchema)RecordSchema.Parse(buildSchema("string"));
-            doubleType  = (RecordSchema)RecordSchema.Parse(buildSchema("double"));
-            intType     = (RecordSchema)RecordSchema.Parse(buildSchema("int"));
-            floatType   = (RecordSchema)RecordSchema.Parse(buildSchema("float"));
+        public opcSchemas()
+        {
+            stringType = (RecordSchema)RecordSchema.Parse(buildSchema("string"));
+            doubleType = (RecordSchema)RecordSchema.Parse(buildSchema("double"));
+            intType = (RecordSchema)RecordSchema.Parse(buildSchema("int"));
+            floatType = (RecordSchema)RecordSchema.Parse(buildSchema("float"));
             booleanType = (RecordSchema)RecordSchema.Parse(buildSchema("boolean"));
-            longType    = (RecordSchema)RecordSchema.Parse(buildSchema("long"));
+            longType = (RecordSchema)RecordSchema.Parse(buildSchema("long"));
 
-            kafka_message = (RecordSchema)RecordSchema.Parse(
-                @"{
-                    name: 'message', 
-                    type: 'record', fields: [
-                            { name: 'key', type:'string'},
-                            { name: 'value', type:'string'},
-                            { name: 'timestamp', type:'string'},
-                        ]
+            rpcRequest = (RecordSchema)RecordSchema.Parse(@"{
+                    'name': 'JSON_RPC_2_0_Request',
+                    'type': 'record',
+                    'fields': [
+                        {
+                            'name': 'method',
+                            'type': 'string'
+                        },
+                        {
+                            'name': 'params',
+                            'type':['null',{'type':'array', 'items': 'string'}],
+                            'default': null
+                        },
+                        {
+                            'name': 'id',
+                            'type': ['null','int'],
+                            'default' : null
+                        }
+                    ]
                 }");
 
-            ack_message = (RecordSchema)RecordSchema.Parse(
-                @"{
-                    type:'record',
-                    name:'acknowledge_write',
-                    fields: [
-                            { name: 'key', type:'string'},
-                            { name: 'value', type:'string'},
-                            { name: 'timestamp', type:'string'},
-                            {name:'kafkaTPO', type:'string', doc:'The topic-partition-offset of the message to be used as a universal identifier string'},
-                            {name:'status', type:'string'}
+            rpcResponse = (RecordSchema)RecordSchema.Parse(@"
+                                    {
+                        'name': 'JSON_RPC_2_0_Response',
+                        'type': 'record',
+                        'fields': [
+                            {
+                                'name': 'result',
+                                'type': ['null','string'],
+                                'default':null
+                            },
+                            {
+                                'name': 'error',
+                                'type':[
+                                    'null',
+                                    {
+                                        'type':'record', 
+                                        'name':'error', 
+                                        'fields': [
+                                            {'name':'code', 'type':'int'},
+                                            {'name':'message', 'type':'string'}
+                                        ]
+                                    }
+                                ],
+                                'default': null
+                            },
+                            {
+                                'name': 'id',
+                                'type': 'int'
+                            }
+                        ]
+                    }");
+
+            rpcError = (RecordSchema)RecordSchema.Parse(@"
+                {
+                    'type':'record', 
+                    'name':'error', 
+                    'fields': [
+                        {'name':'code', 'type':'int'},
+                        {'name':'message', 'type':'string'}
                     ]
-            }");
-            
-            error_message = (RecordSchema)RecordSchema.Parse(
-                @"{
-                    type :'record',
-                    name: 'error',
-                    fields :[
-                        {name:'subsystem', type:'string'},
-                        {name: 'action', type:'string'},
-                        {name:'message', type:'string'}
-                    ]
-            }");
+                }");
         }
 
-        string buildSchema(string type){
-            return "{type: 'record',name:'"+type+"Type',fields:[{name:'value', type:'"+type+"'},{name:'type', type:'string', default:'null'}]}";
+        string buildSchema(string type)
+        {
+            return "{type: 'record',name:'" + type + "Type',fields:[{name:'value', type:'" + type + "'}]}";
         }
 
-        public RecordSchema GetSchema(Type t){
+        public RecordSchema GetSchema(Type t)
+        {
             TypeCode code = Type.GetTypeCode(t);
 
-            switch(code){
-                case TypeCode.Int16 :
+            switch (code)
+            {
+                case TypeCode.Int16:
                     return intType;
-                case TypeCode.Int32 :
+                case TypeCode.Int32:
                     return intType;
-                case TypeCode.Int64 :
+                case TypeCode.Int64:
                     return longType;
-                case TypeCode.Boolean :
+                case TypeCode.Boolean:
                     return booleanType;
                 case TypeCode.Single:
                     return floatType;
@@ -89,16 +124,18 @@ namespace opcKafkaConnect{
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        public static Type getAvroSerializationType(Type t){
+        public static Type getAvroSerializationType(Type t)
+        {
             TypeCode code = Type.GetTypeCode(t);
-            switch(code){
-                case TypeCode.Int16 :
+            switch (code)
+            {
+                case TypeCode.Int16:
                     return typeof(System.Int32);
-                case TypeCode.Int32 :
+                case TypeCode.Int32:
                     return typeof(System.Int32);
-                case TypeCode.Int64 :
+                case TypeCode.Int64:
                     return typeof(System.Int64);
-                case TypeCode.Boolean :
+                case TypeCode.Boolean:
                     return typeof(System.Boolean);
                 case TypeCode.Single:
                     return typeof(System.Single);
@@ -118,16 +155,18 @@ namespace opcKafkaConnect{
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        public static string getAvroType(Type t){
+        public static string getAvroType(Type t)
+        {
             TypeCode code = Type.GetTypeCode(t);
-            switch(code){
-                case TypeCode.Int16 :
+            switch (code)
+            {
+                case TypeCode.Int16:
                     return "int";
-                case TypeCode.Int32 :
+                case TypeCode.Int32:
                     return "int";
-                case TypeCode.Int64 :
+                case TypeCode.Int64:
                     return "long";
-                case TypeCode.Boolean :
+                case TypeCode.Boolean:
                     return "boolean";
                 case TypeCode.Single:
                     return "float";

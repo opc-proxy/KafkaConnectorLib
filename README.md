@@ -9,7 +9,7 @@ This library add the ability to the opc-proxy to stream data to a kafka server. 
 ### Requirements
 - Kafka server running with at least one broker.
 - Confluent Schema Registry running with at least one end-point.
-- On your client side you need support for: kafka-producer/consumer and Avro serialization/deserialization library.
+- On your client side you need support for kafka-producer/consumer and Avro serialization/deserialization library.
 
 ### Configuration
 ```javascript

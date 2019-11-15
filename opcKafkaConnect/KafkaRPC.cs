@@ -23,13 +23,15 @@ namespace opcKafkaConnect
     /// and can be configured independently from the main data-stream.
     /// </summary>
     public class opcKafkaRPC{
-        private IConsumer<String,GenericRecord> _consumer;
+        public IConsumer<String,GenericRecord> _consumer;
         private IProducer<String,GenericRecord> _producer;
         private serviceManager _serv;
         private opcSchemas _schemas;
         private Logger logger;
-
+        private kafkaRPCConf _conf;
         public opcKafkaRPC( kafkaRPCConf conf, CachedSchemaRegistryClient schemaRegistry ){
+            _conf = conf;
+
             logger = LogManager.GetLogger(this.GetType().Name);
             _schemas = new opcSchemas();
 
@@ -61,7 +63,7 @@ namespace opcKafkaConnect
         /// Starts a new thread where the consumer runs and waits for data
         /// </summary>
         /// <param name="cancel"> Cancellation token, to cancel this thread and close the consumer connection to the broker gracefully</param>
-        public Task run(CancellationToken cancel){
+        public void run(CancellationToken cancel){
             Action action = async () =>
             {
                 try
@@ -75,27 +77,27 @@ namespace opcKafkaConnect
                                 var consumeResult = _consumer.Consume(cancel);
                                 logger.Debug("Received kafka message in topic:"+consumeResult.Topic + " key:"+consumeResult.Key + " value:"+ consumeResult.Value);
                                 
-                                JRequest req = validateRequest(consumeResult);
+                                JResponse res = new JResponse();
+                                try{
+                                    JRequest req = validateRequest(consumeResult.Value);
+                                    // at this point only write to opc is supported FIXME
+                                    var status = await _serv.writeToOPCserver((string)req.parameters[0], req.parameters[1]);
 
-                                // Write to OPC and check status of write operation
-                                /*var status = await _serv.writeToOPCserver(req.props[0], req.props[1]);
-                                if(status != null && status.Count > 0 && StatusCode.IsGood(status[0])){
-
-                                    GenericRecord r = new GenericRecord(schemas.ack_message);
-                                    r.Add("key",consumeResult.Key);
-                                    r.Add("value",consumeResult.Value);
-                                    r.Add("timestamp",consumeResult.Timestamp.ToString());
-                                    r.Add("kafkaTPO",consumeResult.Topic + "-"+ consumeResult.Partition.Value.ToString() + "-" +consumeResult.Offset.Value.ToString());
-                                    r.Add("status","SUCCESS");
-                                    var bla = _producer.ProduceAsync(systemName + "-Ack",new Message<string, GenericRecord>{Key="ack-test", Value=r});
+                                    if(status != null && status.Count > 0 && StatusCode.IsGood(status[0])){
+                                        res.setWriteResult(consumeResult, (string)req.parameters[1]);
+                                        await sendResponse(res);
+                                        logger.Debug("Successful Write action to opc-server and Response");
+                                    }
+                                    else {
+                                        res.setError(consumeResult,"Error in writing to OPC server");
+                                        await sendResponse(res);
+                                    }
                                 }
-                                else {
-                                    GenericRecord r = new GenericRecord(schemas.error_message);
-                                    r.Add("subsystem","name");
-                                    r.Add("action","OPC");
-                                    r.Add("message","ERROR");
-                                    var bla = _producer.ProduceAsync("error",new Message<string, GenericRecord>{Key="error-test", Value=r});
-                                }*/
+                                catch{
+                                    logger.Error("Invalid Request, value: "+ consumeResult.Value);
+                                    res.setError(consumeResult,"Invalid Request");
+                                    await sendResponse(res);
+                                }
                             }
                             catch(MessageNullException e){
                                 logger.Error(e.Message);
@@ -116,42 +118,52 @@ namespace opcKafkaConnect
             };
 
 
-            return Task.Run(action,cancel);
+            Task.Run(action,cancel);
             
         }
 
-        public JRequest validateRequest(ConsumeResult<String,GenericRecord> input){
+        /// <summary>
+        /// Send asyncronously a response message on the response-stream.
+        /// </summary>
+        /// <param name="res"></param>
+        public async Task<DeliveryResult<string,GenericRecord>> sendResponse(JResponse res){
+            var record = res.getGenericRecord(_schemas);
+            logger.Debug("Sending response on: {0}, with key {1}",_conf.opcSystemName + "-response", res.key  );
+            return await _producer.ProduceAsync(_conf.opcSystemName + "-response",new Message<string, GenericRecord>{Key=res.key, Value=record});
+        }
+
+        public JRequest validateRequest(GenericRecord input){
             
             object method;
-            object props;
-            object[] props_array;
+            object parameters;
+            object[] parameters_array;
             object id;
             List<String> supported_methods = new List<String>{"write"};
             JRequest req = new JRequest();
 
             // Validate correct types
-            input.Value.TryGetValue("method", out method);
-            if(method == null || method.GetType() != typeof(String)) throw new Exception();
+            input.TryGetValue("method", out method);
+            if(method == null || method.GetType() != typeof(String)) throw new Exception("'method' field null or not a string");
             
-            input.Value.TryGetValue("props", out props);
-            if( props == null || props.GetType() != typeof(Object[])) throw new Exception();
-            props_array = (Object[])props;
+            input.TryGetValue("params", out parameters);
+            if( parameters == null || !parameters.GetType().IsArray) throw new Exception("'params' field null or not an array");
+            parameters_array = (Object[])parameters;
 
-            input.Value.TryGetValue("id", out id);
-            if(id == null || id.GetType() != typeof(Int32)) throw new Exception();
+            input.TryGetValue("id", out id);
+            if(id == null || id.GetType() != typeof(Int32)) throw new Exception("'id' field null or not a integer");
 
             // method not supported
-            if(!supported_methods.Contains((String)method)) throw new Exception();
+            if(!supported_methods.Contains((String)method)) throw new Exception("method '"+method+"' is not supported.");
 
-            // Check if fullfills the write method props
+            // Check if fullfills the write method parameters
             if((String)method == "write") {
-                if( props_array.Length != 2 ) throw new Exception();
-                if( props_array[0].GetType() != typeof(String)) throw new Exception();
-                if( props_array[1].GetType() != typeof(String)) throw new Exception();
+                if( parameters_array.Length != 2 ) throw new Exception("For method 'write', 'params' must have only 2 entry");
+                if( parameters_array[0].GetType() != typeof(String)) throw new Exception("'params' is not an array of strings");
+                if( parameters_array[1].GetType() != typeof(String)) throw new Exception("'params' is not an array of strings");
             }
 
             req.method = (String)method;
-            req.props = props_array;
+            req.parameters = parameters_array;
             req.id = (Int32)id;
 
             return req;
@@ -159,13 +171,65 @@ namespace opcKafkaConnect
 
         public class JRequest {
             public string method {get;set;}
-            public object[] props {get;set;}
+            public object[] parameters {get;set;}
             public Int32 id {get; set;}
             public JRequest(){
                 method = "";
-                props = new Object[]{};
+                parameters = new Object[]{};
                 id = -999;
             }
+        }
+
+        public class JResponse{
+            public string key {get;set;}
+            public string result {get; set;}
+            public string error_message {get; set;}
+            public Int32 error_code {get; set;}
+            public Int32 id {get; set;}
+
+            public JResponse(){
+                result = null;
+                error_message = null;
+                error_code = -999;
+                id = -999;
+                key = "no-key";
+            }
+            public GenericRecord getGenericRecord(opcSchemas schemas){
+                var res = new GenericRecord(schemas.rpcResponse);
+                var error = new GenericRecord(schemas.rpcError);
+                
+                if(result != null) {
+                    res.Add("result",result);
+                    res.Add("error", null);
+                }
+                // if there is an error then overrides the result
+                if(error_code != -999 || error_message != null) {
+                    error.Add("message",error_message);
+                    error.Add("code",error_code);
+                    res.Add("error",error);
+                    res.Add("result",null);
+                }
+                res.Add("id",id);
+                return res;
+            }
+            public void trySetID(GenericRecord r){
+                object identifier;
+                r.TryGetValue("id",out identifier);
+                if(identifier != null && identifier.GetType() == typeof(Int32) ) id = (Int32) identifier;
+            }
+
+            public void setError(ConsumeResult<string,GenericRecord> request, string error){
+                key = request.Key;
+                error_code = 10;
+                error_message = error;
+                trySetID(request.Value);
+            }
+            public void setWriteResult(ConsumeResult<string,GenericRecord> request, string outcome){
+                key = request.Key;
+                trySetID(request.Value);
+                result = outcome;
+            }
+
         }   
     }
 }

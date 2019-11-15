@@ -12,11 +12,13 @@ using Confluent.SchemaRegistry;
 
 namespace Test
 {
-    public class opcKafkaTest
+    [Collection("Sequential")]
+    public class opcProducerTest
     {
-        public KafkaConnect kafka;
+        public opcKafkaProducer kafka;
+        public opcSchemas schemas;
 
-        public opcKafkaTest(){
+        public opcProducerTest(){
             var log = new NLog.Config.LoggingConfiguration();
             var logconsole = new NLog.Targets.ColoredConsoleTarget("logconsole");
             // Rules for mapping loggers to targets            
@@ -24,70 +26,57 @@ namespace Test
             // Apply config           
             NLog.LogManager.Configuration = log; 
 
+            kafkaProducerConf conf = new kafkaProducerConf(){
+                MessageSendMaxRetries= 100,
+                    BatchNumMessages = 23,
+                    QueueBufferingMaxKbytes = 100,
+                    QueueBufferingMaxMessages = 32,
+                    MessageTimeoutMs = 10000,
+                    LingerMs =200
+            };
+             
+            // schema registry
+            var registry = new CachedSchemaRegistryClient(new SchemaRegistryConfig(){
+                Url = "localhost:8081",
+                ValueSubjectNameStrategy = SubjectNameStrategy.TopicRecord
+            } );
 
-            kafka = new KafkaConnect();
-            var conf = JObject.Parse(@"{
-                kafkaProducer:{
-                    MessageSendMaxRetries: 100,
-                    BatchNumMessages:23,
-                    QueueBufferingMaxKbytes:100,
-                    QueueBufferingMaxMessages:32,
-                    MessageTimeoutMs:10000,
-                    LingerMs:200
-                }
-            }");
-            kafka.init(conf);
+            kafka = new opcKafkaProducer(conf, registry);
 
+            schemas = new opcSchemas();
         }
 
         [Fact]
         public void Init()
         {
+            var conf = kafka._conf.getProducerConf();
             // config works
-            Assert.Equal(100, kafka.producer_conf._conf.MessageSendMaxRetries);
-            Assert.Equal(23, kafka.producer_conf._conf.BatchNumMessages);
-            Assert.Equal(100, kafka.producer_conf._conf.QueueBufferingMaxKbytes);
-            Assert.Equal(32,kafka.producer_conf._conf.QueueBufferingMaxMessages);
-            Assert.Equal(10000, kafka.producer_conf._conf.MessageTimeoutMs);
+            Assert.Equal(100, conf.MessageSendMaxRetries);
+            Assert.Equal(23, conf.BatchNumMessages);
+            Assert.Equal(100,conf.QueueBufferingMaxKbytes);
+            Assert.Equal(32,conf.QueueBufferingMaxMessages);
+            Assert.Equal(10000, conf.MessageTimeoutMs);
         }
         [Fact]
         public async void str_message(){
-            // Message schema
-             RecordSchema string_schema = (RecordSchema)RecordSchema.Parse(@"
-                {
-                    ""type"": ""record"",
-                    ""name"": ""str"",
-                    ""fields"": [
-                        {""name"": ""value"", ""type"": ""string""}
-                    ]
-                }");
             // fill the record
-            var record = new GenericRecord(string_schema);
+            var record = new GenericRecord(schemas.stringType);
             record.Add("value","ciao");
 
             //sending message succeded
             var m = new Message<string,GenericRecord>{ Value=record, Key="hey", Timestamp=new Timestamp()};
-            var status = await kafka.sendMessage("test-topic-g", m);
+            var status = await kafka.sendMessage("test-topic-dont-write-here", m);
             Assert.Equal(kafkaMessageStatus.Delivered,status);
         }
         [Fact]
         public async void double_message(){
-            // Message schema
-             RecordSchema string_schema = (RecordSchema)RecordSchema.Parse(@"
-                {
-                    ""type"": ""record"",
-                    ""name"": ""dbl"",
-                    ""fields"": [
-                        {""name"": ""value"", ""type"": ""double""}
-                    ]
-                }");
             // fill the record
-            var record = new GenericRecord(string_schema);
+            var record = new GenericRecord(schemas.doubleType);
             record.Add("value",1098.87);
 
             //sending message succeded
             var m = new Message<string,GenericRecord>{ Value=record, Key="yoyo", Timestamp=new Timestamp()};
-            var status = await kafka.sendMessage("test-topic-g", m);
+            var status = await kafka.sendMessage("test-topic-dont-write-here", m);
             Assert.Equal(kafkaMessageStatus.Delivered,status);
         }
 
@@ -95,12 +84,11 @@ namespace Test
         public async void onNotificationTest()
         {   // the closet test possible of onNotification function
             DataValue v = new DataValue();
-            opcSchemas sl = new opcSchemas();
-            var s = sl.GetSchema(typeof(System.Int16));
+            var s = schemas.GetSchema(typeof(System.Int16));
             v.SourceTimestamp = DateTime.Now;
             v.Value = (Int16) 73;
             var m = kafka.buildKafkaMessage(v,s,typeof(System.Int16),"int16");
-            var status = await kafka.sendMessage("test-topic-g",m);
+            var status = await kafka.sendMessage("test-topic-dont-write-here",m);
             Assert.Equal(kafkaMessageStatus.Delivered,status);
 
             // convert from long to int32 should fail
@@ -110,7 +98,7 @@ namespace Test
 
             v.Value = (Single) 76.9;
             m = kafka.buildKafkaMessage(v,s,typeof(System.Int32),"float_converted_to_Int");
-            status = await kafka.sendMessage("test-topic-g",m);
+            status = await kafka.sendMessage("test-topic-dont-write-here",m);
             Assert.Equal(kafkaMessageStatus.Delivered,status);
         }
     }
