@@ -20,12 +20,13 @@ namespace opcKafkaConnect
         CancellationTokenSource cancel;
 
 
-        public async void init(JObject config){ 
+        public async void init(JObject config, CancellationTokenSource cts){ 
             // setup the logger
             log = LogManager.GetLogger(this.GetType().Name);
             kafkaConfWrapper conf = config.ToObject<kafkaConfWrapper>();
             // producer config
             var producer_conf = conf.kafkaProducer;
+            cancel = cts;
 
             // instance the schema registry
             schemaRegistry = new CachedSchemaRegistryClient(new SchemaRegistryConfig(){
@@ -43,7 +44,6 @@ namespace opcKafkaConnect
 
             // instance consumer in new thread
             kafkaRPC = new opcKafkaRPC(conf.kafkaRPC, schemaRegistry);
-            cancel = new CancellationTokenSource();
             kafkaRPC.setManager(_serv);
             kafkaRPC.run(cancel.Token);
             

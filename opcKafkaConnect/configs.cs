@@ -58,11 +58,18 @@ namespace opcKafkaConnect{
             // Necessary behaviour for OPC WRITE
             _conf.EnableAutoCommit = true;
             _conf.EnableAutoOffsetStore = true;
-            _conf.AutoCommitIntervalMs = 100;
-            _conf.SessionTimeoutMs = 6000;
+            _conf.AutoCommitIntervalMs = 5000;
+            _conf.SessionTimeoutMs = 10000;
             _conf.AutoOffsetReset = AutoOffsetReset.Latest;
             _conf.EnablePartitionEof = false;
-            _conf.FetchWaitMaxMs = 0;
+            
+            // this parameter is not well explained in the docs but eventually I found it has a large impact on CPU usage 
+            // even if there are NO message sent! very likely it influences the poll rate
+            _conf.FetchWaitMaxMs = 1000;      
+            
+            //  with this parameter instead we say to send immediately any message, because they are certainly larger than 1 byte
+            _conf.FetchMinBytes = 1;
+            _conf.HeartbeatIntervalMs = 3000;
         }
     }
     /// <summary>
