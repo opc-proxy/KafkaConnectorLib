@@ -20,24 +20,22 @@ namespace opcKafkaConnect
         CancellationTokenSource cancel;
 
 
-        public async void init(JObject config, CancellationTokenSource cts){ 
+        public void init(JObject config, CancellationTokenSource cts){ 
             // setup the logger
             log = LogManager.GetLogger(this.GetType().Name);
             kafkaConfWrapper conf = config.ToObject<kafkaConfWrapper>();
             // producer config
             var producer_conf = conf.kafkaProducer;
             cancel = cts;
-
             // instance the schema registry
             schemaRegistry = new CachedSchemaRegistryClient(new SchemaRegistryConfig(){
                 Url = conf.KafkaSchemaRegistryURL, 
                 ValueSubjectNameStrategy = SubjectNameStrategy.TopicRecord
             } );
 
-            // This will crash if schema registry is offline FIXME, 
             // this part is only here to make sure the user has the schema registry up, otherwise
             // the error is misleading: "Delivery failed: Local: Key serialization error"
-            var lst = await schemaRegistry.GetAllSubjectsAsync();
+            testSchemaRegistry();
 
             // instace producer with Avro serializers
             producer = new opcKafkaProducer(conf.kafkaProducer,schemaRegistry);
@@ -45,8 +43,7 @@ namespace opcKafkaConnect
             // instance consumer in new thread
             kafkaRPC = new opcKafkaRPC(conf.kafkaRPC, schemaRegistry);
             kafkaRPC.setManager(_serv);
-            kafkaRPC.run(cancel.Token);
-            
+            kafkaRPC.run(cancel.Token);   
         }
 
         /// <summary>
@@ -60,6 +57,26 @@ namespace opcKafkaConnect
 
         public void setServiceManager(serviceManager serv){
             _serv = serv;
+        }
+
+        public async void testSchemaRegistry(){
+            try{
+                var lst = await schemaRegistry.GetAllSubjectsAsync();
+            }
+            catch(Exception e){
+                log.Fatal("Problem in initializing Confluent Schema Registry: "+e.Message);
+                cancel.Cancel();
+            }
+        }
+
+        public void clean(){
+            log.Debug("Flushing producer...");
+            try{
+                producer.producer.Flush(new TimeSpan(0,0,0,0,500));
+            }
+            catch(Exception e){
+                log.Error("Producer failed to flush " + e.Message);
+            }
         }
     }
 }

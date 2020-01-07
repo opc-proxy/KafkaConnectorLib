@@ -1,7 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+	  <TargetFramework>netstandard2.0</TargetFramework>
+	  <PackageId>opcProxy.KafkaConnector</PackageId>
+	  <Version>0.1.0</Version>
+	  <Authors>Alessandro Manfredini</Authors>
+          <Company>University of Zurich</Company>
   </PropertyGroup>
 
   <ItemGroup>
@@ -10,10 +14,12 @@
     <PackageReference Include="Confluent.SchemaRegistry.Serdes" Version="1.3.0-PRE1" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
     <PackageReference Include="NLog" Version="4.6.7" />
+    <!--<PackageReference Include="opcProxy.core" Version="0.1.1" />-->
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\opc-core\opcProxyCore\opcProxyCore.csproj" />
   </ItemGroup>
+
 
 </Project>
