@@ -6,12 +6,23 @@ This library add the ability to the opc-proxy to stream data to a kafka server. 
 - Bidirectional comunication with the PLC using an RPC protocol. The protocol supported is JSON-RPC-2.0.
 - Read and Write of OPC variable to server trough Kafka producer/consumer client.
 
-### Requirements
+# Requirements
 - Kafka server running with at least one broker.
 - Confluent Schema Registry running with at least one end-point.
 - On your client side you need support for kafka-producer/consumer and Avro serialization/deserialization library.
 
-### Configuration
+# Documentation
+
+You can find full documentation at [opc-proxy.readthedocs.io](https://opc-proxy.readthedocs.io/en/latest/connectors.html#kafka)
+
+
+# NodeJS Client Example
+
+A minimal example client for NodeJS that implements a communication between this OPC-Proxy Connector
+trough a Kafka server can be found [here](https://github.com/opc-proxy/OPC-Node-Client-Examples/tree/master/Examples/Kafka). 
+
+
+# Configuration
 ```javascript
 {
     // details on meaning of parameters for the Producer can be found in:
@@ -32,7 +43,7 @@ This library add the ability to the opc-proxy to stream data to a kafka server. 
 }
 ```
 
-### Data Serialization
+# Data Serialization
 
-### RPC Protocol Trough Kafka
+# RPC Protocol Trough Kafka
 
