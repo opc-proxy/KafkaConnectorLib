@@ -150,7 +150,8 @@ namespace opcKafkaConnect
             parameters_array = (Object[])parameters;
 
             input.TryGetValue("id", out id);
-            if(id == null || id.GetType() != typeof(Int32)) throw new Exception("'id' field null or not a integer");
+            if( id == null ) id = -999;
+            else if( id.GetType() != typeof(Int32)) throw new Exception("'id' field null or not a integer");
 
             // method not supported
             if(!supported_methods.Contains((String)method)) throw new Exception("method '"+method+"' is not supported.");
@@ -172,7 +173,7 @@ namespace opcKafkaConnect
         public class JRequest {
             public string method {get;set;}
             public object[] parameters {get;set;}
-            public Int32 id {get; set;}
+            public long id {get; set;}
             public JRequest(){
                 method = "";
                 parameters = new Object[]{};
@@ -185,7 +186,7 @@ namespace opcKafkaConnect
             public string result {get; set;}
             public string error_message {get; set;}
             public Int32 error_code {get; set;}
-            public Int32 id {get; set;}
+            public long id {get; set;}
 
             public JResponse(){
                 result = null;
@@ -212,21 +213,27 @@ namespace opcKafkaConnect
                 res.Add("id",id);
                 return res;
             }
-            public void trySetID(GenericRecord r){
+            /// <summary>
+            /// Sets the response ID to the Request ID if exist or to the provided offset
+            /// </summary>
+            /// <param name="r"></param>
+            /// <param name="offset"></param>
+            public void trySetID(GenericRecord r, long offset){
                 object identifier;
                 r.TryGetValue("id",out identifier);
                 if(identifier != null && identifier.GetType() == typeof(Int32) ) id = (Int32) identifier;
+                else id = offset;
             }
 
             public void setError(ConsumeResult<string,GenericRecord> request, string error){
                 key = request.Key;
                 error_code = 10;
                 error_message = error;
-                trySetID(request.Value);
+                trySetID(request.Value, request.Offset.Value);
             }
             public void setWriteResult(ConsumeResult<string,GenericRecord> request, string outcome){
                 key = request.Key;
-                trySetID(request.Value);
+                trySetID(request.Value, request.Offset.Value);
                 result = outcome;
             }
 

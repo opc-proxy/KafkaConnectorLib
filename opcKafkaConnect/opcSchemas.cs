@@ -39,7 +39,7 @@ namespace opcKafkaConnect
                         },
                         {
                             'name': 'id',
-                            'type': ['null','int'],
+                            'type': ['null','long'],
                             'default' : null
                         }
                     ]
@@ -72,7 +72,7 @@ namespace opcKafkaConnect
                             },
                             {
                                 'name': 'id',
-                                'type': 'int'
+                                'type': 'long'
                             }
                         ]
                     }");

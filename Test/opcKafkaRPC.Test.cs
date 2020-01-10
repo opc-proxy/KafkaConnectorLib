@@ -104,6 +104,8 @@ namespace Test
 
             req.Add("id", "90");
             Assert.Throws<Exception>(()=>{rpc.validateRequest(req);});
+            req.Add("id",null); // this should not throw
+            
 
         }
 
