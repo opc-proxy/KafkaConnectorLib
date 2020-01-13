@@ -47,6 +47,8 @@ namespace opcKafkaConnect{
 
         public string opcSystemName;
 
+        public bool enableKafkaRPC {get; set;}
+
         public ConsumerConfig getConsumerConf(){
             return _conf;
         }
@@ -55,6 +57,7 @@ namespace opcKafkaConnect{
             BootstrapServers = "localhost:9092";
             GroupId = "OPC";
             opcSystemName = "OPC";
+            enableKafkaRPC = true;
             // Necessary behaviour for OPC WRITE
             _conf.EnableAutoCommit = true;
             _conf.EnableAutoOffsetStore = true;

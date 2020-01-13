@@ -43,7 +43,7 @@ namespace opcKafkaConnect
             // instance consumer in new thread
             kafkaRPC = new opcKafkaRPC(conf.kafkaRPC, schemaRegistry);
             kafkaRPC.setManager(_serv);
-            kafkaRPC.run(cancel.Token);   
+            if(conf.kafkaRPC.enableKafkaRPC) kafkaRPC.run(cancel.Token);   
         }
 
         /// <summary>
