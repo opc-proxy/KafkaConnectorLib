@@ -39,7 +39,7 @@ namespace opcKafkaConnect
 
             // instace producer with Avro serializers
             producer = new opcKafkaProducer(conf.kafkaProducer,schemaRegistry);
-
+            
             // instance consumer in new thread
             kafkaRPC = new opcKafkaRPC(conf.kafkaRPC, schemaRegistry);
             kafkaRPC.setManager(_serv);

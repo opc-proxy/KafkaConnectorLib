@@ -54,6 +54,12 @@ namespace opcKafkaConnect
             .SetValueSerializer(new AvroSerializer<GenericRecord>(schemaRegistry))
             .SetErrorHandler((_, e) => logger.Error($"Error: {e.Reason}"))
             .Build();
+
+            if(_conf.enableKafkaRPC){
+                logger.Info("Connected to broker: "+ _conf.BootstrapServers);
+                logger.Info("Request are to be made on topic: "+ conf.opcSystemName + "-request");
+                logger.Info("Response will be on topic: "+ _conf.opcSystemName + "-response");
+            }
         }
         public void setManager(serviceManager m){
             _serv = m;
@@ -68,6 +74,7 @@ namespace opcKafkaConnect
             {
                 try
                 {
+                    logger.Info("is ON and starting consuming");
                     while(true)
                     {   
                         try

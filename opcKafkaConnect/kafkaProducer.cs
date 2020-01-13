@@ -35,6 +35,9 @@ namespace opcKafkaConnect
             .SetValueSerializer(new AvroSerializer<GenericRecord>(schemaRegistry))
             .SetErrorHandler((_, e) => log.Error($"Error: {e.Reason}"))
             .Build();
+
+            log.Info("Producer streaming to broker: " + _conf.BootstrapServers);
+            log.Info("Data stream on topic: " + _conf.opcSystemName);
         }
 
         /// <summary>
