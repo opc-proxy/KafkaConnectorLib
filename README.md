@@ -16,6 +16,12 @@ This library add the ability to the opc-proxy to stream data to a kafka server. 
 You can find full documentation at [opc-proxy.readthedocs.io](https://opc-proxy.readthedocs.io/en/latest/connectors.html#kafka)
 
 
+# Add it to your project with nuGet
+
+```bash
+dotnet add package opcProxy.KafkaConnector 
+```
+
 # NodeJS Client Example
 
 A minimal example client for NodeJS that implements a communication between this OPC-Proxy Connector
