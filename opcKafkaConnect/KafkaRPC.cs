@@ -82,15 +82,17 @@ namespace opcKafkaConnect
                             logger.Debug("consuming....");
                             try{
                                 var consumeResult = _consumer.Consume(cancel);
-                                logger.Debug("Received kafka message in topic:"+consumeResult.Topic + " key:"+consumeResult.Key + " value:"+ consumeResult.Value);
+                                logger.Debug("Received kafka message in topic:"+consumeResult.Topic + " key:"+consumeResult.Message.Key + " value:"+ consumeResult.Message.Value);
                                 
                                 JResponse res = new JResponse();
                                 try{
-                                    JRequest req = validateRequest(consumeResult.Value);
-                                    // at this point only write to opc is supported FIXME
-                                    var status = await _serv.writeToOPCserver((string)req.parameters[0], req.parameters[1]);
+                                    JRequest req = validateRequest(consumeResult.Message.Value);
+                                    // at this point only write signle variable to opc is supported FIXME
+                                    string[] names = {(string)req.parameters[0]};
+                                    object[] values = {req.parameters[1]};
+                                    var w_resp = await _serv.writeToOPCserver(names, values);
 
-                                    if(status != null && status.Count > 0 && StatusCode.IsGood(status[0])){
+                                    if(w_resp[0].success){
                                         res.setWriteResult(consumeResult, (string)req.parameters[1]);
                                         await sendResponse(res);
                                         logger.Debug("Successful Write action to opc-server and Response");
@@ -101,7 +103,7 @@ namespace opcKafkaConnect
                                     }
                                 }
                                 catch{
-                                    logger.Error("Invalid Request, value: "+ consumeResult.Value);
+                                    logger.Error("Invalid Request, value: "+ consumeResult.Message.Value);
                                     res.setError(consumeResult,"Invalid Request");
                                     await sendResponse(res);
                                 }
@@ -233,14 +235,14 @@ namespace opcKafkaConnect
             }
 
             public void setError(ConsumeResult<string,GenericRecord> request, string error){
-                key = request.Key;
+                key = request.Message.Key;
                 error_code = 10;
                 error_message = error;
-                trySetID(request.Value, request.Offset.Value);
+                trySetID(request.Message.Value, request.Offset.Value);
             }
             public void setWriteResult(ConsumeResult<string,GenericRecord> request, string outcome){
-                key = request.Key;
-                trySetID(request.Value, request.Offset.Value);
+                key = request.Message.Key;
+                trySetID(request.Message.Value, request.Offset.Value);
                 result = outcome;
             }
 
